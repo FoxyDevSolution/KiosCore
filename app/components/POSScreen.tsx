@@ -1,6 +1,9 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { searchProductByBarcode } from "@/actions/searchProduct";
+import { BarcodeScanner } from "./BarcodeScanner";
+import ProductModal from "./ProductModal";
 
 /* ── Data ────────────────────────────────────────────────── */
 const CATALOG = [
@@ -36,10 +39,34 @@ export default function POSScreen({ onAddProduct }: { onAddProduct: () => void }
   const [quinGross, setQuinGross] = useState("");
   const [scanOpen, setScanOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"cart" | "pay">("cart");
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+  // USB Barcode Listener
+  useEffect(() => {
+    let buffer = "";
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        if (buffer) {
+          const product = await searchProductByBarcode(buffer);
+          if (product) {
+            // addItem(product) // Assume product structure fits
+            console.log("Scanned:", product);
+          } else {
+            setShowQuickAdd(true);
+          }
+          buffer = "";
+        }
+      } else if (e.key.length === 1) {
+        buffer += e.key;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const results = CATALOG.filter(p => q.length > 0 && p.name.toLowerCase().includes(q.toLowerCase()));
 
-  const addItem = (p: typeof CATALOG[0]) => {
+  const addItem = (p: any) => {
     setCart(prev => {
       const ex = prev.find(i => i.id === p.id);
       if (ex) return prev.map(i => i.id === p.id ? { ...i, qty: i.qty + 1 } : i);
@@ -389,13 +416,14 @@ export default function POSScreen({ onAddProduct }: { onAddProduct: () => void }
               <h3 style={{ fontWeight: 600, fontSize: 15, color: "#F8FAFC" }}>Escanear Código</h3>
               <button onClick={() => setScanOpen(false)} className="kc-btn-ghost" style={{ width: 30, height: 30, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
-            <div style={{ aspectRatio: "1", borderRadius: 14, background: "#0B0D13", border: "2px dashed #3B82F640", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10 }}>
-              <span style={{ fontSize: 48 }}>📷</span>
-              <p style={{ fontSize: 13, color: "#64748B" }}>Apuntá al código de barras</p>
-            </div>
+            <BarcodeScanner onScan={(code) => { /* handle scan */ console.log(code) }} onClose={() => setScanOpen(false)} />
             <button onClick={() => setScanOpen(false)} className="kc-btn-ghost" style={{ width: "100%", padding: "10px", marginTop: 12, textAlign: "center" }}>Cancelar</button>
           </div>
         </div>
+      )}
+      
+      {showQuickAdd && (
+          <ProductModal onClose={() => setShowQuickAdd(false)} />
       )}
     </>
   );
